@@ -41,6 +41,7 @@ try {
 
 const participantsCollection = db.collection("participants")
 
+
 app.post("/participants", async (req, res) => {
   const name = req.body.name;
 
@@ -71,11 +72,12 @@ app.post("/participants", async (req, res) => {
              type: "status",
              time: dayjs().format("HH:mm:ss"),
            });
-         res.status(201)
+         res.status(201).send("Usuário cadastrado com sucesso")
     } catch (err) {
     console.log(err);
   }
 });
+
 
 app.get("/participants", async (req, res) => {
     
@@ -103,7 +105,7 @@ if(validation.error){
   return res.status(422).send(errors)
 }
 
-const messageFrom = await participantsCollection.findOne({name: from})
+const messageFrom = participantsCollection.find({name: from}).collation({locale: "pt", strength: 1 }).toArray()
 
 if(!messageFrom){
  return res.status(422).send("Remetente não encontrado")
@@ -124,6 +126,12 @@ res.status(201).send("Mensagem cadastrada com sucesso")
 app.get("/messages", async (req, res) => {
 
 
+  try{
+    const messages = await messagesCollection.find().toArray()
+    res.send(messages)
+}catch (err){
+    console.log(err)
+}
 
 
 
