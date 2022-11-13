@@ -16,7 +16,7 @@ const participantSchema = joi.object({
 const messagesSchema = joi.object({
   to: joi.string().min(1),
   text: joi.string().min(1),
-  type: joi.string().valid("message", "private_message"),
+  type: joi.string().valid("message", "private_message", "status"),
 });
 
 //--------------------------------------------------------------------------------------------
@@ -64,14 +64,14 @@ app.post("/participants", async (req, res) => {
       lastStatus: Date.now(),
     });
 
-    const message = await db.collection("status").insertOne({
-      from: newParticipant,
+    const message = await db.collection("messages").insertOne({
+      from: name,
       to: "Todos",
       text: "entra na sala...",
       type: "status",
       time: dayjs().format("HH:mm:ss"),
     });
-    res.status(201).send("Usuário cadastrado com sucesso");
+    res.status(201).send("Usuário cadastrado com sucesso!");
   } catch (err) {
     console.log(err);
   }
@@ -134,7 +134,7 @@ app.get("/messages", async (req, res) => {
     const messages = await messagesCollection
       .find({
         $or: [
-          { type: "message" },
+          { type: "message", type: "status" },
           { type: "private_message", to: user },
           { type: "private_message", from: user },
         ],
@@ -153,6 +153,20 @@ app.get("/messages", async (req, res) => {
     console.log(err);
   }
 });
+
+//ROTA STATUS ----------------------------------------------------------------------------
+
+app.post("/status", async (req, res) => {
+
+const user = req.headers.user
+
+
+
+
+})
+
+
+
 
 app.listen(5000, () => {
   console.log("Server running on port 5000");
