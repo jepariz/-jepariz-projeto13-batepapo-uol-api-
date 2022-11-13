@@ -158,10 +158,23 @@ app.get("/messages", async (req, res) => {
 
 app.post("/status", async (req, res) => {
 
-const user = req.headers.user
+const {user} = req.headers
+
+try{
+  const status = await participantsCollection.findOne({
+    name: user})
+  
+  if(!status){
+    res.status(404).send("Usuário não encontrado")
+  }
 
 
+participantsCollection.updateOne({lastStatus: status.lastStatus}, {$set: {lastStatus: Date.now() }})
+res.status(200).send("status atualizado!")
 
+} catch (err){
+  console.log(err)
+}
 
 })
 
