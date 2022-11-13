@@ -10,7 +10,7 @@ const app = express();
 //SCHEMAS ------------------------------------------------------------------------------------
 
 const participantSchema = joi.object({
-  name: joi.string().min(1).required(),
+  name: joi.string().required().trim().min(1),
 });
 
 const messagesSchema = joi.object({
@@ -41,12 +41,16 @@ try {
 const participantsCollection = db.collection("participants");
 
 app.post("/participants", async (req, res) => {
-  const { name } = req.body;
+  const {name} = req.body;
 
-  const validation = participantSchema.validate(name);
+  const validation = participantSchema.validate(req.body);
 
-  if (validation.error) {
+  if(validation.error) {
     res.status(422);
+  }
+
+  if(name === null || name === undefined){
+    res.status(422)
   }
 
   try {
@@ -64,7 +68,7 @@ app.post("/participants", async (req, res) => {
       lastStatus: Date.now(),
     });
 
-    const message = await db.collection("messages").insertOne({
+    const message = await messagesCollection.insertOne({
       from: name,
       to: "Todos",
       text: "entra na sala...",
@@ -79,7 +83,7 @@ app.post("/participants", async (req, res) => {
 
 app.get("/participants", async (req, res) => {
   try {
-    const participants = await db.collection("participants").find().toArray();
+    const participants = await participantsCollection.find().toArray();
     res.send(participants);
   } catch (err) {
     console.log(err);
@@ -101,10 +105,7 @@ app.post("/messages", async (req, res) => {
     return res.status(422).send(errors);
   }
 
-  const messageFrom = participantsCollection
-    .find({ name: from })
-    .collation({ locale: "pt", strength: 1 })
-    .toArray();
+  const messageFrom = participantsCollection.findOne({ name: from });
 
   if (!messageFrom) {
     return res.status(422).send("Remetente não encontrado");
@@ -134,7 +135,8 @@ app.get("/messages", async (req, res) => {
     const messages = await messagesCollection
       .find({
         $or: [
-          { type: "message", type: "status" },
+          { type: "message" },
+          { type: "status" },
           { type: "private_message", to: user },
           { type: "private_message", from: user },
         ],
@@ -157,29 +159,51 @@ app.get("/messages", async (req, res) => {
 //ROTA STATUS ----------------------------------------------------------------------------
 
 app.post("/status", async (req, res) => {
+  const { user } = req.headers;
 
-const {user} = req.headers
+  try {
+    const status = await participantsCollection.findOne({
+      name: user,
+    });
 
-try{
-  const status = await participantsCollection.findOne({
-    name: user})
-  
-  if(!status){
-    res.status(404).send("Usuário não encontrado")
+    if (!status) {
+      res.status(404).send("Usuário não encontrado");
+    }
+
+    participantsCollection.updateOne(
+      { lastStatus: status.lastStatus },
+      { $set: { lastStatus: Date.now() } }
+    );
+    res.status(200).send("status atualizado!");
+  } catch (err) {
+    console.log(err);
   }
+});
 
+setInterval(async () => {
+  const participants = await participantsCollection.find().toArray();
+  const participantsOffline = participants.filter(
+    (part) => part.lastStatus < Date.now() - 10000
+  );
 
-participantsCollection.updateOne({lastStatus: status.lastStatus}, {$set: {lastStatus: Date.now() }})
-res.status(200).send("status atualizado!")
+  try {
+    await participantsCollection.deleteMany({
+      lastStatus: { $lt: Date.now() - 10000 },
+    });
 
-} catch (err){
-  console.log(err)
-}
-
-})
-
-
-
+    participantsOffline.forEach(async (part) => {
+      await messagesCollection.insertOne({
+        from: part.name,
+        to: "Todos",
+        text: "sai da sala...",
+        type: "status",
+        time: dayjs().format("HH:mm:ss"),
+      });
+    });
+  } catch (err) {
+    console.error(err);
+  }
+}, 15000);
 
 app.listen(5000, () => {
   console.log("Server running on port 5000");
