@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv";
 import joi from "joi";
 import dayjs from "dayjs";
@@ -45,8 +45,6 @@ app.post("/participants", async (req, res) => {
  
 
   try {
-
-
     const validation = participantSchema.validateAsync({name: name});
 
     if(validation.error) {
@@ -156,6 +154,37 @@ app.get("/messages", async (req, res) => {
   }
 });
 
+app.delete("/messages/:ID_DA_MENSAGEM", async (req, res) => {
+
+  const user = req.headers.user
+  const id = req.params.ID_DA_MENSAGEM
+
+  console.log(id)
+
+  try{
+
+    const messageFound = await messagesCollection.findOne({_id: new ObjectId(id)})
+
+    if(!messageFound){
+      res.status(404).send("Mensagem não encontrada")
+      return
+    }
+    
+  
+    if(messageFound.from !== user){
+      res.status(401).send("Mensagem de outro usuário")
+      return
+    }
+  
+  await messagesCollection.deleteOne({_id: new ObjectId(id)})
+  res.status(200).send("Mensagem deletada com sucesso")
+
+  }catch (err){
+    console.log(err)
+  }
+
+})
+
 //ROTA STATUS ----------------------------------------------------------------------------
 
 app.post("/status", async (req, res) => {
@@ -180,30 +209,30 @@ app.post("/status", async (req, res) => {
   }
 });
 
-setInterval(async () => {
-  const participants = await participantsCollection.find().toArray();
-  const participantsOffline = participants.filter(
-    (part) => part.lastStatus < Date.now() - 10000
-  );
+// setInterval(async () => {
+//   const participants = await participantsCollection.find().toArray();
+//   const participantsOffline = participants.filter(
+//     (part) => part.lastStatus < Date.now() - 10000
+//   );
 
-  try {
-    await participantsCollection.deleteMany({
-      lastStatus: { $lt: Date.now() - 10000 },
-    });
+//   try {
+//     await participantsCollection.deleteMany({
+//       lastStatus: { $lt: Date.now() - 10000 },
+//     });
 
-    participantsOffline.forEach(async (part) => {
-      await messagesCollection.insertOne({
-        from: part.name,
-        to: "Todos",
-        text: "sai da sala...",
-        type: "status",
-        time: dayjs().format("HH:mm:ss"),
-      });
-    });
-  } catch (err) {
-    console.error(err);
-  }
-}, 15000);
+//     participantsOffline.forEach(async (part) => {
+//       await messagesCollection.insertOne({
+//         from: part.name,
+//         to: "Todos",
+//         text: "sai da sala...",
+//         type: "status",
+//         time: dayjs().format("HH:mm:ss"),
+//       });
+//     });
+//   } catch (err) {
+//     console.error(err);
+//   }
+// }, 15000);
 
 app.listen(5000, () => {
   console.log("Server running on port 5000");
