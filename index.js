@@ -19,6 +19,12 @@ const messagesSchema = joi.object({
   type: joi.string().valid("message", "private_message", "status"),
 });
 
+const editMessageSchema = joi.object({
+  to: joi.string().min(1),
+  text: joi.string().min(1).required().trim(),
+  type: joi.string().valid("message", "private_message"),
+})
+
 //--------------------------------------------------------------------------------------------
 
 dotenv.config();
@@ -182,6 +188,51 @@ app.delete("/messages/:ID_DA_MENSAGEM", async (req, res) => {
   }catch (err){
     console.log(err)
   }
+
+})
+
+app.put("/messages/:ID_DA_MENSAGEM", async (req, res) =>{
+
+const {to, text, type} = req.body
+const from = req.headers.user
+const user = req.headers.user
+const id = req.params.ID_DA_MENSAGEM
+
+try{
+
+  const validation = editMessageSchema.validateAsync({to: to, text: text, type: type}, {abortEarly: false})
+
+  if(validation.error){
+    const errors = validation.error.details.map((e) => e.message);
+    return res.status(422).send(errors);
+  }
+  
+  const messageFrom = await participantsCollection.findOne({ name: from });
+  
+  if (!messageFrom) {
+    return res.status(422).send("Mensagem de outro usuário");
+  }
+  
+  const messageFound = await messagesCollection.findOne({_id: new ObjectId(id)})
+  
+  if(!messageFound){
+    res.status(404).send("Mensagem não encontrada")
+    return
+  }
+  
+  if(messageFound.from !== user){
+    res.status(401).send("Mensagem de outro usuário")
+    return
+  }
+
+  await messagesCollection.updateOne({_id: new ObjectId(id)}, {$set: req.body})
+  res.sendStatus(200)
+
+}catch (err){
+  console.log(err)
+}
+
+
 
 })
 
