@@ -10,8 +10,8 @@ const app = express();
 //SCHEMAS ------------------------------------------------------------------------------------
 
 const participantSchema = joi.object({
-  name: joi.string().required().min(1)
-})
+  name: joi.string().required().min(1),
+});
 
 const messagesSchema = joi.object({
   to: joi.string().min(1),
@@ -23,7 +23,7 @@ const editMessageSchema = joi.object({
   to: joi.string().min(1),
   text: joi.string().min(1).required().trim(),
   type: joi.string().valid("message", "private_message"),
-})
+});
 
 //--------------------------------------------------------------------------------------------
 
@@ -48,14 +48,13 @@ const participantsCollection = db.collection("participants");
 
 app.post("/participants", async (req, res) => {
   const name = req.body.name;
- 
 
   try {
-    const validation = participantSchema.validateAsync({name: name});
+    const validation = participantSchema.validateAsync({ name: name });
 
-    if(validation.error) {
+    if (validation.error) {
       res.status(422);
-      return
+      return;
     }
 
     const activeParticipants = await participantsCollection.findOne({
@@ -161,78 +160,77 @@ app.get("/messages", async (req, res) => {
 });
 
 app.delete("/messages/:ID_DA_MENSAGEM", async (req, res) => {
+  const user = req.headers.user;
+  const id = req.params.ID_DA_MENSAGEM;
 
-  const user = req.headers.user
-  const id = req.params.ID_DA_MENSAGEM
+  try {
+    const messageFound = await messagesCollection.findOne({
+      _id: new ObjectId(id),
+    });
 
-  console.log(id)
-
-  try{
-
-    const messageFound = await messagesCollection.findOne({_id: new ObjectId(id)})
-
-    if(!messageFound){
-      res.status(404).send("Mensagem não encontrada")
-      return
+    if (!messageFound) {
+      res.status(404).send("Mensagem não encontrada");
+      return;
     }
-    
-  
-    if(messageFound.from !== user){
-      res.status(401).send("Mensagem de outro usuário")
-      return
+
+    if (messageFound.from !== user) {
+      res.status(401).send("Mensagem de outro usuário");
+      return;
     }
-  
-  await messagesCollection.deleteOne({_id: new ObjectId(id)})
-  res.status(200).send("Mensagem deletada com sucesso")
 
-  }catch (err){
-    console.log(err)
+    await messagesCollection.deleteOne({ _id: new ObjectId(id) });
+    res.status(200).send("Mensagem deletada com sucesso");
+  } catch (err) {
+    console.log(err);
   }
+});
 
-})
+app.put("/messages/:ID_DA_MENSAGEM", async (req, res) => {
+  const { to, text, type } = req.body;
+  const from = req.headers.user;
+  const user = req.headers.user;
+  const id = req.params.ID_DA_MENSAGEM;
 
-app.put("/messages/:ID_DA_MENSAGEM", async (req, res) =>{
+  try {
+    const validation = editMessageSchema.validateAsync(
+      { to: to, text: text, type: type },
+      { abortEarly: false }
+    );
 
-const {to, text, type} = req.body
-const from = req.headers.user
-const user = req.headers.user
-const id = req.params.ID_DA_MENSAGEM
+    if (validation.error) {
+      const errors = validation.error.details.map((e) => e.message);
+      return res.status(422).send(errors);
+    }
 
-try{
+    const messageFrom = await participantsCollection.findOne({ name: from });
 
-  const validation = editMessageSchema.validateAsync({to: to, text: text, type: type}, {abortEarly: false})
+    if (!messageFrom) {
+      return res.status(422).send("Mensagem de outro usuário");
+    }
 
-  if(validation.error){
-    const errors = validation.error.details.map((e) => e.message);
-    return res.status(422).send(errors);
+    const messageFound = await messagesCollection.findOne({
+      _id: new ObjectId(id),
+    });
+
+    if (!messageFound) {
+      res.status(404).send("Mensagem não encontrada");
+      return;
+    }
+
+    if (messageFound.from !== user) {
+      res.status(401).send("Mensagem de outro usuário");
+      return;
+    }
+
+    await messagesCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: req.body }
+    );
+    res.sendStatus(200);
+  } catch (err) {
+    console.log(err);
   }
-  
-  const messageFrom = await participantsCollection.findOne({ name: from });
-  
-  if (!messageFrom) {
-    return res.status(422).send("Mensagem de outro usuário");
-  }
-  
-  const messageFound = await messagesCollection.findOne({_id: new ObjectId(id)})
-  
-  if(!messageFound){
-    res.status(404).send("Mensagem não encontrada")
-    return
-  }
-  
-  if(messageFound.from !== user){
-    res.status(401).send("Mensagem de outro usuário")
-    return
-  }
-
-  await messagesCollection.updateOne({_id: new ObjectId(id)}, {$set: req.body})
-  res.sendStatus(200)
-
-}catch (err){
-  console.log(err)
-}
-
-})
+});
 
 //ROTA STATUS ----------------------------------------------------------------------------
 
@@ -257,6 +255,8 @@ app.post("/status", async (req, res) => {
     console.log(err);
   }
 });
+
+//----------------------------------------------------------------------------------------
 
 setInterval(async () => {
   const participants = await participantsCollection.find().toArray();
