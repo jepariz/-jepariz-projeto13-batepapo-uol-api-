@@ -10,12 +10,12 @@ const app = express();
 //SCHEMAS ------------------------------------------------------------------------------------
 
 const participantSchema = joi.object({
-  name: joi.string().required().trim().min(1),
-});
+  name: joi.string().required().min(1)
+})
 
 const messagesSchema = joi.object({
   to: joi.string().min(1),
-  text: joi.string().min(1),
+  text: joi.string().min(1).required().trim(),
   type: joi.string().valid("message", "private_message", "status"),
 });
 
@@ -41,19 +41,19 @@ try {
 const participantsCollection = db.collection("participants");
 
 app.post("/participants", async (req, res) => {
-  const {name} = req.body;
-
-  const validation = participantSchema.validate(req.body);
-
-  if(validation.error) {
-    res.status(422);
-  }
-
-  if(name === null || name === undefined){
-    res.status(422)
-  }
+  const name = req.body.name;
+ 
 
   try {
+
+
+    const validation = participantSchema.validateAsync({name: name});
+
+    if(validation.error) {
+      res.status(422);
+      return
+    }
+
     const activeParticipants = await participantsCollection.findOne({
       name: name,
     });
@@ -64,7 +64,7 @@ app.post("/participants", async (req, res) => {
     }
 
     const newParticipant = await participantsCollection.insertOne({
-      name: req.body.name,
+      name: name,
       lastStatus: Date.now(),
     });
 
