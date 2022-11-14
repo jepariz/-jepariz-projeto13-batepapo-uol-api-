@@ -232,8 +232,6 @@ try{
   console.log(err)
 }
 
-
-
 })
 
 //ROTA STATUS ----------------------------------------------------------------------------
@@ -260,30 +258,30 @@ app.post("/status", async (req, res) => {
   }
 });
 
-// setInterval(async () => {
-//   const participants = await participantsCollection.find().toArray();
-//   const participantsOffline = participants.filter(
-//     (part) => part.lastStatus < Date.now() - 10000
-//   );
+setInterval(async () => {
+  const participants = await participantsCollection.find().toArray();
+  const participantsOffline = participants.filter(
+    (part) => part.lastStatus < Date.now() - 10000
+  );
 
-//   try {
-//     await participantsCollection.deleteMany({
-//       lastStatus: { $lt: Date.now() - 10000 },
-//     });
+  try {
+    await participantsCollection.deleteMany({
+      lastStatus: { $lt: Date.now() - 10000 },
+    });
 
-//     participantsOffline.forEach(async (part) => {
-//       await messagesCollection.insertOne({
-//         from: part.name,
-//         to: "Todos",
-//         text: "sai da sala...",
-//         type: "status",
-//         time: dayjs().format("HH:mm:ss"),
-//       });
-//     });
-//   } catch (err) {
-//     console.error(err);
-//   }
-// }, 15000);
+    participantsOffline.forEach(async (part) => {
+      await messagesCollection.insertOne({
+        from: part.name,
+        to: "Todos",
+        text: "sai da sala...",
+        type: "status",
+        time: dayjs().format("HH:mm:ss"),
+      });
+    });
+  } catch (err) {
+    console.error(err);
+  }
+}, 15000);
 
 app.listen(5000, () => {
   console.log("Server running on port 5000");
